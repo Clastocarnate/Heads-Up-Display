@@ -6,8 +6,8 @@ from ultralytics import YOLO
 model = YOLO("/Users/madhuupadhyay/Documents/Stark_Industries/Heads-Up-Display/runs/detect/train10/weights/best.pt")
 
 # Load the crosshair image and resize it to 500x500
-crosshair = cv2.imread('assets/crosshair.png', cv2.IMREAD_UNCHANGED)  # Load with alpha channel
-crosshair = cv2.resize(crosshair, (500, 500), interpolation=cv2.INTER_AREA)
+crosshair = cv2.imread('assets/Atman_right.png', cv2.IMREAD_UNCHANGED)  # Load with alpha channel
+crosshair = cv2.resize(crosshair, (1400, 400), interpolation=cv2.INTER_AREA)
 crosshair_height, crosshair_width, _ = crosshair.shape
 
 # Start capturing video from the webcam (source=0)
