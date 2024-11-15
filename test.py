@@ -1,9 +1,8 @@
 import cv2
 import numpy as np
-from ultralytics import YOLO
 
-# Load the YOLO model
-model = YOLO("/Users/madhuupadhyay/Documents/Stark_Industries/Heads-Up-Display/runs/detect/train10/weights/best.pt")
+# Load the Haar cascade for face detection
+haar_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 
 # Load the crosshair image (Atman_right.png) and resize it to use as a bounding box overlay
 crosshair = cv2.imread('assets/Atman_right.png', cv2.IMREAD_UNCHANGED)  # Load with alpha channel
@@ -35,41 +34,34 @@ while True:
     center_x, center_y = frame_width // 2, frame_height // 2
     cv2.circle(frame, (center_x, center_y), radius=10, color=(255, 0, 0), thickness=-1)  # Blue circle
 
-    # Make predictions on the frame
-    results = model(frame)
+    # Convert frame to grayscale for Haar cascade detection
+    gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-    # Get predictions from the results
-    detections = results[0].boxes
+    # Detect faces using Haar cascade
+    detections = haar_cascade.detectMultiScale(gray_frame, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
 
     # Flag to check if center circle is inside any detection
     center_in_detection = False
 
     # Loop through each detection and overlay the crosshair image (bounding box)
-    for detection in detections:
-        if detection.conf.cpu().item() < 0.85:
-            continue
-
-        x1, y1, x2, y2 = map(int, detection.xyxy[0].cpu().numpy())  # Bounding box coordinates
-
+    for (x, y, w, h) in detections:
         # Check if the center circle is inside the detection box
-        if x1 <= center_x <= x2 and y1 <= center_y <= y2:
+        if x <= center_x <= (x + w) and y <= center_y <= (y + h):
             center_in_detection = True
 
         # Calculate where to place the crosshair image (as bounding box overlay)
-        top_left_x = x1
-        top_left_y = y1
-        width = x2 - x1
-        height = y2 - y1
+        top_left_x = x
+        top_left_y = y
 
         # Resize the crosshair to match the size of the bounding box
-        crosshair_resized = cv2.resize(crosshair, (width, height), interpolation=cv2.INTER_AREA)
+        crosshair_resized = cv2.resize(crosshair, (w, h), interpolation=cv2.INTER_AREA)
 
         # Ensure the crosshair is not placed outside of the frame boundaries
-        if top_left_x < 0 or top_left_y < 0 or (top_left_x + width) > frame.shape[1] or (top_left_y + height) > frame.shape[0]:
+        if top_left_x < 0 or top_left_y < 0 or (top_left_x + w) > frame.shape[1] or (top_left_y + h) > frame.shape[0]:
             continue
 
         # Extract region of interest (ROI) where crosshair will be placed
-        roi = frame[top_left_y:top_left_y + height, top_left_x:top_left_x + width]
+        roi = frame[top_left_y:top_left_y + h, top_left_x:top_left_x + w]
 
         # Split the crosshair into its color and alpha channel
         crosshair_rgb = crosshair_resized[:, :, :3]
@@ -81,20 +73,20 @@ while True:
                             (1 - crosshair_alpha) * roi[:, :, c])
 
         # Replace the ROI in the frame with the blended image
-        frame[top_left_y:top_left_y + height, top_left_x:top_left_x + width] = roi
+        frame[top_left_y:top_left_y + h, top_left_x:top_left_x + w] = roi
 
     # If the center circle is inside Atman_right.png (detected bounding box), overlay the text
     if center_in_detection:
         # Resize the transparent box to accommodate the text
         box_height, box_width, _ = transparent_box.shape
-        box_width_resized = 400
+        box_width_resized = 300  # Reduced size of the text box
         scale = box_width_resized / box_width
         box_height_resized = int(box_height * scale)
         transparent_box_resized = cv2.resize(transparent_box, (box_width_resized, box_height_resized), interpolation=cv2.INTER_AREA)
 
         # Set text properties
         font = cv2.FONT_HERSHEY_COMPLEX
-        font_scale = 0.7
+        font_scale = 0.5  # Reduced font size
         font_thickness = 1
         text_color = (255, 255, 255)  # White
 
@@ -117,10 +109,10 @@ while True:
         frame[box_pos_y:box_pos_y + box_height_resized, box_pos_x:box_pos_x + box_width_resized] = box_roi
 
         # Overlay the text on the transparent box
-        y_offset = box_pos_y + 80
+        y_offset = box_pos_y + 50
         for line in text_lines:
-            cv2.putText(frame, line.strip(), (box_pos_x + 30, y_offset), font, font_scale, text_color, font_thickness)
-            y_offset += 30
+            cv2.putText(frame, line.strip(), (box_pos_x + 15, y_offset), font, font_scale, text_color, font_thickness)
+            y_offset += 20
 
     # Create a side-by-side view for VR
     sbs_frame = np.concatenate((frame, frame), axis=1)
